@@ -115,6 +115,44 @@ jobs:
             pnpm-shared-stable-${{ matrix.os }}-${{ matrix.target }}
           lookup-only: true
 
+      - name: Setup Go (macc core)
+        if: github.event.inputs[matrix.input] == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: false
+
+      - name: Build macc-enabled verge-mihomo sidecar
+        if: github.event.inputs[matrix.input] == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TARGET="${{ matrix.target }}"
+          case "$TARGET" in
+            x86_64-pc-windows-msvc)    GOOS=windows; GOARCH=amd64 ;;
+            aarch64-pc-windows-msvc)   GOOS=windows; GOARCH=arm64 ;;
+            x86_64-apple-darwin)       GOOS=darwin;  GOARCH=amd64 ;;
+            aarch64-apple-darwin)      GOOS=darwin;  GOARCH=arm64 ;;
+            x86_64-unknown-linux-gnu)  GOOS=linux;   GOARCH=amd64 ;;
+            aarch64-unknown-linux-gnu) GOOS=linux;   GOARCH=arm64 ;;
+            *) echo "unsupported target: $TARGET"; exit 1 ;;
+          esac
+          EXT=""
+          if [ "$GOOS" = "windows" ]; then EXT=".exe"; fi
+          SRC="$RUNNER_TEMP/mihomo-macc-src"
+          rm -rf "$SRC"
+          git clone --depth 1 --branch Meta https://github.com/edwardlewis35/mihomo.git "$SRC"
+          mkdir -p src-tauri/sidecar
+          OUT="src-tauri/sidecar/verge-mihomo-${TARGET}${EXT}"
+          ( cd "$SRC" && \
+            CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" go build \
+              -tags "with_gvisor" -trimpath \
+              -ldflags "-s -w -buildid= -X 'github.com/metacubex/mihomo/constant.Version=macc-${TARGET}'" \
+              -o "$GITHUB_WORKSPACE/$OUT" . )
+          chmod +x "$OUT" 2>/dev/null || true
+          ls -la "$OUT"
+          "$OUT" -v 2>/dev/null || true
+
       - name: Pnpm install and check
         if: github.event.inputs[matrix.input] == 'true'
         run: |
