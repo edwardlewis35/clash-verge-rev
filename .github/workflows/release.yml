@@ -268,8 +268,14 @@ jobs:
               -ldflags "-s -w -buildid= -X 'github.com/metacubex/mihomo/constant.Version=macc-${TARGET}'" \
               -o "$GITHUB_WORKSPACE/$OUT" . )
           chmod +x "$OUT" 2>/dev/null || true
+          # alpha sidecar uses the same macc core, so prebuild.mjs has
+          # nothing left to download from MetaCubeX/mihomo.
+          cp "$OUT" "src-tauri/sidecar/verge-mihomo-alpha-${TARGET}${EXT}"
+          ls -la src-tauri/sidecar/
+          echo "--- macc evidence ---"
+          grep -a -c "N8tY4q1xLk" "$OUT" | sed "s/^/MaccSalt occurrences: /"
+          grep -a -o "macc-${TARGET}" "$OUT" | head -1
           ls -la "$OUT"
-          "$OUT" -v 2>/dev/null || true
 
       - name: Pnpm install and check
         run: |
