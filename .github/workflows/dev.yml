@@ -167,6 +167,33 @@ jobs:
           rustup target list --installed
           echo "Rust target ${{ matrix.target }} installed."
 
+      - name: Select Apple signing credentials
+        if: github.event.inputs[matrix.input] == 'true'
+        shell: bash
+        env:
+          CERT: ${{ secrets.APPLE_CERTIFICATE }}
+          CERT_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          SIGN_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID_IN: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD_IN: ${{ secrets.APPLE_PASSWORD }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # GitHub Actions defines a secret-derived env var as "" when the
+          # secret is missing, and tauri-bundler only checks whether the var
+          # exists -- an empty APPLE_CERTIFICATE makes it try to import a
+          # non-existent .p12 and the macOS job dies in codesign. Export the
+          # Apple vars into GITHUB_ENV only when a real certificate exists.
+          if [ -n "${CERT}" ]; then
+            echo "APPLE_CERTIFICATE=$CERT" >> "$GITHUB_ENV"
+            echo "APPLE_CERTIFICATE_PASSWORD=$CERT_PASSWORD" >> "$GITHUB_ENV"
+            echo "APPLE_SIGNING_IDENTITY=$SIGN_IDENTITY" >> "$GITHUB_ENV"
+            echo "APPLE_ID=$APPLE_ID_IN" >> "$GITHUB_ENV"
+            echo "APPLE_PASSWORD=$APPLE_PASSWORD_IN" >> "$GITHUB_ENV"
+            echo "APPLE_TEAM_ID=$TEAM_ID" >> "$GITHUB_ENV"
+          else
+            echo "No APPLE_CERTIFICATE secret -- macOS bundle will be unsigned."
+          fi
+
       - name: Tauri build
         if: github.event.inputs[matrix.input] == 'true'
         uses: tauri-apps/tauri-action@v1
@@ -175,12 +202,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tauriScript: pnpm
           args: --target ${{ matrix.target }} -b ${{ matrix.bundle }}
